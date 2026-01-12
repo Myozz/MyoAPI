@@ -1,0 +1,56 @@
+# =============================================================================
+# MyoAPI - CVE Aggregator API
+# Cloudflare Workers Configuration
+# =============================================================================
+
+name = "api"
+main = "src/index.ts"
+compatibility_date = "2024-12-30"
+
+# -----------------------------------------------------------------------------
+# KV Namespaces
+# Save CVE data and indexes for fast lookups
+# -----------------------------------------------------------------------------
+[[kv_namespaces]]
+binding = "CVE_DATA"
+preview_id = "ee38d185d67d4a688be861c0978c9d85"
+id = "ee38d185d67d4a688be861c0978c9d85"
+
+[[kv_namespaces]]
+binding = "CVE_INDEX"
+preview_id = "fa6c7c31c03b4945b46f051a34e37a7c"
+id = "fa6c7c31c03b4945b46f051a34e37a7c"
+
+[[kv_namespaces]]
+binding = "METADATA"
+preview_id = "0628ea9cc63e41139065f4e45bba9578"
+id = "0628ea9cc63e41139065f4e45bba9578"
+
+# -----------------------------------------------------------------------------
+# Cron Triggers
+# Scheduled jobs to update data daily
+# -----------------------------------------------------------------------------
+# [triggers]
+# Disabled - Using GitHub Actions for cron instead (free tier CPU limits)
+# crons = ["0 2 * * *"]
+
+# -----------------------------------------------------------------------------
+# Environment Variables
+# Configurations that are not sensitive (secrets will be set separately)
+# -----------------------------------------------------------------------------
+[vars]
+ENVIRONMENT = "production"
+API_VERSION = "v1"
+# Rate limit config (requests per minute)
+RATE_LIMIT_ANONYMOUS = "100"
+RATE_LIMIT_AUTHENTICATED = "1000"
+
+# -----------------------------------------------------------------------------
+# Development Environment
+# Override config for local dev
+# -----------------------------------------------------------------------------
+[env.dev]
+name = "myoapi-dev"
+
+[env.dev.vars]
+ENVIRONMENT = "development"

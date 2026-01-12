@@ -1,0 +1,32 @@
+name: Daily CVE Sync
+
+on:
+  schedule:
+    # Run at 02:00 UTC daily (09:00 Vietnam time)
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    # Allow manual trigger from GitHub UI
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    env:
+      CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CVE_DATA_NAMESPACE_ID: ${{ secrets.CVE_DATA_NAMESPACE_ID }}
+      CVE_INDEX_NAMESPACE_ID: ${{ secrets.CVE_INDEX_NAMESPACE_ID }}
+      METADATA_NAMESPACE_ID: ${{ secrets.METADATA_NAMESPACE_ID }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Run CVE Data Sync
+        run: node scripts/sync-data.mjs
