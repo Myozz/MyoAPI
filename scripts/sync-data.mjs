@@ -26,8 +26,10 @@ async function fetchOsvVulnerabilities() {
     const allVulns = [];
 
     for (const ecosystem of ECOSYSTEMS) {
+        if (allVulns.length >= MAX_TOTAL_CVES) break;
+
         try {
-            // Fetch modified_id.csv to get recent vulnerabilities
+            // Fetch modified_id.csv to get recent vulnerabilities (OSV/GHSA IDs)
             const csvUrl = `https://storage.googleapis.com/osv-vulnerabilities/${ecosystem}/modified_id.csv`;
             const response = await fetch(csvUrl);
 
@@ -39,33 +41,37 @@ async function fetchOsvVulnerabilities() {
             const csvText = await response.text();
             const lines = csvText.trim().split('\n');
 
-            // Get most recent CVEs (skip header if exists)
-            const cveIds = [];
+            // Get OSV IDs (GHSA-*, etc.)
+            const osvIds = [];
             for (const line of lines) {
-                const [id] = line.split(',');
-                if (id?.startsWith('CVE-')) {
-                    cveIds.push(id.trim());
-                    if (cveIds.length >= MAX_CVES_PER_ECOSYSTEM) break;
+                const parts = line.split(',');
+                const id = parts[1]?.trim() || parts[0]?.trim();
+                if (id && (id.startsWith('GHSA-') || id.startsWith('OSV-'))) {
+                    osvIds.push(id);
+                    if (osvIds.length >= MAX_CVES_PER_ECOSYSTEM * 2) break; // Fetch more to filter
                 }
             }
 
-            console.log(`[OSV] Found ${cveIds.length} CVEs in ${ecosystem}`);
+            console.log(`[OSV] Found ${osvIds.length} advisories in ${ecosystem}`);
 
-            // Fetch vulnerability details for each CVE
-            for (const cveId of cveIds) {
+            // Fetch details and filter for those with CVE aliases
+            let cveCount = 0;
+            for (const osvId of osvIds) {
                 if (allVulns.length >= MAX_TOTAL_CVES) break;
+                if (cveCount >= MAX_CVES_PER_ECOSYSTEM) break;
 
-                const vuln = await fetchOsvVulnDetails(cveId);
-                if (vuln) {
+                const vuln = await fetchOsvVulnDetails(osvId);
+                if (vuln && vuln.cveId) {
                     vuln.ecosystem = ecosystem;
                     allVulns.push(vuln);
+                    cveCount++;
                 }
 
                 // Small delay to avoid rate limiting
                 await new Promise(r => setTimeout(r, 50));
             }
 
-            if (allVulns.length >= MAX_TOTAL_CVES) break;
+            console.log(`[OSV] Got ${cveCount} CVEs from ${ecosystem}`);
 
         } catch (error) {
             console.error(`[OSV] Error fetching ${ecosystem}:`, error.message);
@@ -76,8 +82,9 @@ async function fetchOsvVulnerabilities() {
     return allVulns;
 }
 
-async function fetchOsvVulnDetails(cveId) {
-    const url = `https://api.osv.dev/v1/vulns/${cveId}`;
+
+async function fetchOsvVulnDetails(osvId) {
+    const url = `https://api.osv.dev/v1/vulns/${osvId}`;
 
     try {
         const response = await fetch(url, {
@@ -88,8 +95,13 @@ async function fetchOsvVulnDetails(cveId) {
 
         const data = await response.json();
 
+        // Extract CVE ID from aliases
+        const cveId = data.aliases?.find(a => a.startsWith('CVE-')) || null;
+        if (!cveId) return null;  // Skip if no CVE alias
+
         return {
-            id: data.id,
+            id: cveId,
+            osvId: data.id,
             aliases: data.aliases || [],
             summary: data.summary || '',
             details: data.details || '',
@@ -98,12 +110,13 @@ async function fetchOsvVulnDetails(cveId) {
             affected: (data.affected || []).map(a => ({
                 package: a.package?.name,
                 ecosystem: a.package?.ecosystem,
-                versions: a.versions?.slice(0, 10) || [],  // Limit versions
+                versions: a.versions?.slice(0, 10) || [],
                 ranges: a.ranges?.slice(0, 3) || []
             })),
             references: (data.references || []).slice(0, 10).map(r => r.url),
             severity: extractSeverityFromOsv(data),
-            cvssFromOsv: extractCvssFromOsv(data)
+            cvssFromOsv: extractCvssFromOsv(data),
+            cveId: cveId
         };
     } catch (error) {
         return null;
