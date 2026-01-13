@@ -3,45 +3,14 @@
  * MyoAPI - Cloudflare Workers Environment Types
  * =============================================================================
  *
- * Type definitions for Cloudflare Workers bindings (KV, Environment Variables).
- * Used for type-safe access to resources within Workers.
+ * Type definitions for Cloudflare Workers bindings.
+ * Now using Supabase PostgreSQL instead of KV.
  */
 
 /**
  * Cloudflare Workers Environment Bindings
- *
- * These bindings are defined in wrangler.toml and injected into Worker runtime.
  */
 export interface Env {
-    // ---------------------------------------------------------------------------
-    // KV Namespaces
-    // ---------------------------------------------------------------------------
-
-    /**
-     * Storage for CVE records
-     * Key format: "cve:{CVE-ID}" -> JSON string of CveRecord
-     */
-    CVE_DATA: KVNamespace;
-
-    /**
-     * Storage for indexes for fast lookups
-     * Key formats:
-     * - "idx:eco:{ecosystem}" -> JSON array of CVE IDs
-     * - "idx:sev:{severity}" -> JSON array of CVE IDs
-     * - "idx:kev" -> JSON array of KEV CVE IDs
-     * - "idx:recent" -> JSON array of recently modified CVE IDs
-     */
-    CVE_INDEX: KVNamespace;
-
-    /**
-     * Metadata and rate limiting
-     * Key formats:
-     * - "meta:stats" -> ApiStats JSON
-     * - "meta:sync" -> SyncMetadata JSON
-     * - "rate:{ip}" -> Rate limit counter
-     */
-    METADATA: KVNamespace;
-
     // ---------------------------------------------------------------------------
     // Environment Variables
     // ---------------------------------------------------------------------------
@@ -59,13 +28,6 @@ export interface Env {
     RATE_LIMIT_AUTHENTICATED: string;
 
     // ---------------------------------------------------------------------------
-    // Secrets (set via wrangler secret put)
-    // ---------------------------------------------------------------------------
-
-    /** NVD API key (optional, increases rate limit) */
-    NVD_API_KEY?: string;
-
-    // ---------------------------------------------------------------------------
     // Supabase
     // ---------------------------------------------------------------------------
 
@@ -74,6 +36,13 @@ export interface Env {
 
     /** Supabase anon/public key for read access */
     SUPABASE_ANON_KEY: string;
+
+    // ---------------------------------------------------------------------------
+    // Secrets (optional)
+    // ---------------------------------------------------------------------------
+
+    /** NVD API key (optional, for sync scripts) */
+    NVD_API_KEY?: string;
 }
 
 /**

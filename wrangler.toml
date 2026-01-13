@@ -8,23 +8,23 @@ main = "src/index.ts"
 compatibility_date = "2024-12-30"
 
 # -----------------------------------------------------------------------------
-# KV Namespaces
-# Save CVE data and indexes for fast lookups
+# KV Namespaces (DEPRECATED - Now using Supabase)
+# Kept for reference, not used in production
 # -----------------------------------------------------------------------------
-[[kv_namespaces]]
-binding = "CVE_DATA"
-preview_id = "ee38d185d67d4a688be861c0978c9d85"
-id = "ee38d185d67d4a688be861c0978c9d85"
+# [[kv_namespaces]]
+# binding = "CVE_DATA"
+# preview_id = "ee38d185d67d4a688be861c0978c9d85"
+# id = "ee38d185d67d4a688be861c0978c9d85"
 
-[[kv_namespaces]]
-binding = "CVE_INDEX"
-preview_id = "fa6c7c31c03b4945b46f051a34e37a7c"
-id = "fa6c7c31c03b4945b46f051a34e37a7c"
+# [[kv_namespaces]]
+# binding = "CVE_INDEX"
+# preview_id = "fa6c7c31c03b4945b46f051a34e37a7c"
+# id = "fa6c7c31c03b4945b46f051a34e37a7c"
 
-[[kv_namespaces]]
-binding = "METADATA"
-preview_id = "0628ea9cc63e41139065f4e45bba9578"
-id = "0628ea9cc63e41139065f4e45bba9578"
+# [[kv_namespaces]]
+# binding = "METADATA"
+# preview_id = "0628ea9cc63e41139065f4e45bba9578"
+# id = "0628ea9cc63e41139065f4e45bba9578"
 
 # -----------------------------------------------------------------------------
 # Cron Triggers

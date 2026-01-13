@@ -5,3 +5,4 @@
  */
 
 export * from './ratelimit';
+export * from './cors';
