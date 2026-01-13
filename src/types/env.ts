@@ -64,6 +64,16 @@ export interface Env {
 
     /** NVD API key (optional, increases rate limit) */
     NVD_API_KEY?: string;
+
+    // ---------------------------------------------------------------------------
+    // Supabase
+    // ---------------------------------------------------------------------------
+
+    /** Supabase project URL */
+    SUPABASE_URL: string;
+
+    /** Supabase anon/public key for read access */
+    SUPABASE_ANON_KEY: string;
 }
 
 /**

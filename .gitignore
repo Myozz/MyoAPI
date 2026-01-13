@@ -36,3 +36,7 @@ coverage/
 # Temporary files
 tmp/
 temp/
+
+# Data sync secrets (private)
+scripts/.env
+scripts/DATA_SOURCES.md

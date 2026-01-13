@@ -11,7 +11,13 @@
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["cve", "vulnerability", "security", "api", "cloudflare-workers"],
+  "keywords": [
+    "cve",
+    "vulnerability",
+    "security",
+    "api",
+    "cloudflare-workers"
+  ],
   "author": "MyoAPI Team",
   "license": "MIT",
   "devDependencies": {
@@ -22,6 +28,9 @@
     "wrangler": "^3.99.0"
   },
   "dependencies": {
-    "hono": "^4.6.0"
+    "@supabase/supabase-js": "^2.90.1",
+    "hono": "^4.6.0",
+    "jszip": "^3.10.1",
+    "lzma-native": "^8.0.6"
   }
 }

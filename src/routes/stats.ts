@@ -1,25 +1,16 @@
 /**
  * =============================================================================
- * MyoAPI - Stats Routes
+ * MyoAPI - Stats Routes (Supabase Version)
  * =============================================================================
- *
- * API endpoints for statistics:
- * - GET /api/v1/stats - Overview statistics
- * - GET /api/v1/stats/ecosystems - Stats by ecosystem
- * - GET /api/v1/stats/health - Health check
  */
 
 import { Hono } from 'hono';
-import type { ApiStats, SingleResponse } from '../models/cve';
 import type { AppType } from '../types';
 
 // =============================================================================
 // ROUTES
 // =============================================================================
 
-/**
- * Create stats routes
- */
 export function createStatsRoutes(): Hono<AppType> {
     const app = new Hono<AppType>();
 
@@ -28,82 +19,66 @@ export function createStatsRoutes(): Hono<AppType> {
         const startTime = Date.now();
         const requestId = c.var.requestId ?? crypto.randomUUID();
 
-        const statsData = await c.env.METADATA.get('meta:stats');
+        try {
+            const headers = {
+                'apikey': c.env.SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${c.env.SUPABASE_ANON_KEY}`,
+                'Prefer': 'count=exact',
+            };
 
-        if (!statsData) {
-            const emptyStats: ApiStats = {
-                totalCves: 0,
-                bySeverity: { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, UNKNOWN: 0 },
-                byEcosystem: {},
-                kevCount: 0,
-                lastSyncTime: 'Never',
-                sources: {
-                    osv: { lastSync: 'Never', count: 0 },
-                    epss: { lastSync: 'Never', date: 'Never' },
-                    kev: { lastSync: 'Never', count: 0 },
+            // Count queries - simpler approach
+            const [totalRes, criticalRes, highRes, kevRes, osvRes] = await Promise.all([
+                fetch(`${c.env.SUPABASE_URL}/rest/v1/cves?select=id&limit=0`, { headers }),
+                fetch(`${c.env.SUPABASE_URL}/rest/v1/cves?select=id&severity=eq.CRITICAL&limit=0`, { headers }),
+                fetch(`${c.env.SUPABASE_URL}/rest/v1/cves?select=id&severity=eq.HIGH&limit=0`, { headers }),
+                fetch(`${c.env.SUPABASE_URL}/rest/v1/cves?select=id&kev->>is_known=eq.true&limit=0`, { headers }),
+                fetch(`${c.env.SUPABASE_URL}/rest/v1/cves?select=id&sources=cs.{osv}&limit=0`, { headers }),
+            ]);
+
+            const getCount = (res: Response) => parseInt(res.headers.get('content-range')?.split('/')[1] || '0');
+
+            const stats = {
+                totalCves: getCount(totalRes),
+                bySeverity: {
+                    CRITICAL: getCount(criticalRes),
+                    HIGH: getCount(highRes),
                 },
+                kevCount: getCount(kevRes),
+                osvCount: getCount(osvRes),
+                sources: ['NVD', 'OSV', 'EPSS', 'CISA KEV'],
+                database: 'Supabase PostgreSQL',
             };
 
             return c.json({
-                data: emptyStats,
+                data: stats,
                 meta: { requestId, timestamp: new Date().toISOString(), executionTimeMs: Date.now() - startTime },
-            } satisfies SingleResponse<ApiStats>);
+            });
+        } catch (error) {
+            return c.json({
+                error: { code: 'STATS_ERROR', message: (error as Error).message },
+                meta: { requestId, timestamp: new Date().toISOString() },
+            }, 500);
         }
-
-        const stats = JSON.parse(statsData) as ApiStats;
-        const executionTimeMs = Date.now() - startTime;
-
-        const response: SingleResponse<ApiStats> = {
-            data: stats,
-            meta: { requestId, timestamp: new Date().toISOString(), executionTimeMs },
-        };
-
-        return c.json(response);
     });
 
-    // GET /api/v1/stats/ecosystems - Stats by ecosystem
-    app.get('/ecosystems', async (c) => {
-        const startTime = Date.now();
-        const requestId = c.var.requestId ?? crypto.randomUUID();
-
-        const statsData = await c.env.METADATA.get('meta:stats');
-        let ecosystemStats: Record<string, number> = {};
-
-        if (statsData) {
-            const stats = JSON.parse(statsData) as ApiStats;
-            ecosystemStats = stats.byEcosystem;
-        }
-
-        const executionTimeMs = Date.now() - startTime;
-
-        return c.json({
-            data: ecosystemStats,
-            meta: { requestId, timestamp: new Date().toISOString(), executionTimeMs },
-        });
-    });
-
-    // GET /api/v1/stats/health - Health check endpoint
+    // GET /api/v1/stats/health - Health check
     app.get('/health', async (c) => {
         const requestId = c.var.requestId ?? crypto.randomUUID();
 
         try {
-            await c.env.METADATA.get('meta:sync');
-
-            return c.json({
-                status: 'healthy',
-                timestamp: new Date().toISOString(),
-                requestId,
-            });
-        } catch (error) {
-            return c.json(
-                {
-                    status: 'unhealthy',
-                    error: error instanceof Error ? error.message : 'Unknown error',
-                    timestamp: new Date().toISOString(),
-                    requestId,
+            const response = await fetch(`${c.env.SUPABASE_URL}/rest/v1/cves?select=id&limit=1`, {
+                headers: {
+                    'apikey': c.env.SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${c.env.SUPABASE_ANON_KEY}`,
                 },
-                503
-            );
+            });
+
+            if (response.ok) {
+                return c.json({ status: 'healthy', database: 'connected', timestamp: new Date().toISOString(), requestId });
+            }
+            throw new Error(`Supabase returned ${response.status}`);
+        } catch (error) {
+            return c.json({ status: 'unhealthy', error: (error as Error).message, timestamp: new Date().toISOString(), requestId }, 503);
         }
     });
 
