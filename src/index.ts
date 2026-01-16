@@ -52,7 +52,7 @@ app.get('/', (c) => {
         name: 'MyoAPI',
         description: 'CVE Aggregator API - Centralized vulnerability data from multiple sources',
         version: '1.0.0',
-        documentation: 'https://github.com/your-repo/myoapi',
+        documentation: 'https://github.com/Myozz/MyoAPI',
         endpoints: {
             cve: '/api/v1/cve/:id',
             search: '/api/v1/cve/search',
