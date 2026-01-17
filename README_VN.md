@@ -7,7 +7,7 @@ API tổng hợp dữ liệu lỗ hổng bảo mật (CVE) miễn phí, mã ngu�
 - **328K+ CVEs** từ NVD (1999-2026)
 - **5 nguồn dữ liệu**: NVD, OSV, GHSA, EPSS, CISA KEV
 - **Myo Score**: Điểm ưu tiên = CVSS (30%) + EPSS (50%) + KEV (20%)
-- **CWE & CPE**: Loại lỗ hổng và định danh sản phẩm
+- **Multi-source CVSS**: Điểm từ NVD, GHSA, OSV
 - **Tìm theo Package**: Query CVE theo package và ecosystem
 - **Miễn phí**: Không cần API key
 
@@ -37,9 +37,19 @@ https://api.myoapi.workers.dev
     "title": "Prototype Pollution in lodash",
     "myo_severity": "CRITICAL",
     "myo_score": 0.85,
-    "cvss_score": 9.8,
-    "epss_score": 0.45,
-    "is_kev": true,
+    "cvss": {
+      "nvd": 9.8,
+      "ghsa": 9.8,
+      "osv": null
+    },
+    "epss": {
+      "score": 0.45,
+      "percentile": 0.97
+    },
+    "kev": {
+      "is_known": true,
+      "date_added": "2023-01-15"
+    },
     "ghsa_id": "GHSA-35jh-r3h4-6jhm",
     "cwe": ["CWE-1321"],
     "cpe": ["cpe:2.3:a:lodash:lodash:*:*:*:*:*:*:*:*"],
@@ -62,10 +72,14 @@ https://api.myoapi.workers.dev
 |--------|-------|-------|
 | `myo_severity` | Tính toán | CRITICAL/HIGH/MEDIUM/LOW |
 | `myo_score` | Tính toán | Điểm ưu tiên 0.0-1.0 |
-| `cvss_score` | NVD > GHSA > OSV | Điểm CVSS |
-| `epss_score` | EPSS | Xác suất bị khai thác |
-| `affected_versions` | OSV/GHSA | Phiên bản bị ảnh hưởng |
-| `fixed_versions` | OSV/GHSA | Phiên bản đã sửa |
+| `cvss.nvd` | NVD | Điểm CVSS từ NVD |
+| `cvss.ghsa` | GHSA | Điểm CVSS từ GitHub |
+| `cvss.osv` | OSV | Điểm CVSS từ OSV |
+| `epss.score` | EPSS | Xác suất bị khai thác |
+| `epss.percentile` | EPSS | Xếp hạng percentile |
+| `kev.is_known` | CISA KEV | Đang bị khai thác |
+| `kev.date_added` | CISA KEV | Ngày thêm vào KEV |
+| `affected_packages` | OSV + GHSA | Packages bị ảnh hưởng |
 
 ## Công thức Myo Score
 

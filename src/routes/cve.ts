@@ -57,17 +57,21 @@ interface SearchParams {
     sortOrder: 'asc' | 'desc';
 }
 
+interface CvssScores {
+    nvd: number | null;
+    ghsa: number | null;
+    osv: number | null;
+}
+
 interface EnhancedCveResponse {
     id: string;
     title: string | null;
     description: string;
     myo_severity: string;
     myo_score: number;
-    cvss_score: number | null;
-    epss_score: number | null;
-    epss_percentile: number | null;
-    is_kev: boolean;
-    kev_date_added: string | null;
+    cvss: CvssScores;
+    epss: { score: number | null; percentile: number | null };
+    kev: { is_known: boolean; date_added: string | null };
     ghsa_id: string | null;
     cwe: string[];
     cpe: string[];
@@ -91,10 +95,6 @@ function getPrioritySeverity(score: number): string {
     return 'UNKNOWN';
 }
 
-function getBestCvssScore(cvss: CveRecord['cvss']): number | null {
-    return cvss.nvd?.score ?? cvss.ghsa?.score ?? cvss.osv?.score ?? null;
-}
-
 function getGhsaId(aliases: string[]): string | null {
     return aliases.find(a => a.startsWith('GHSA-')) ?? null;
 }
@@ -113,11 +113,19 @@ function enhanceCveRecord(record: CveRecord): EnhancedCveResponse {
         description: record.description,
         myo_severity: getPrioritySeverity(record.priority_score),
         myo_score: record.priority_score,
-        cvss_score: getBestCvssScore(record.cvss),
-        epss_score: record.epss.score,
-        epss_percentile: record.epss.percentile,
-        is_kev: record.kev.is_known,
-        kev_date_added: record.kev.date_added,
+        cvss: {
+            nvd: record.cvss.nvd?.score ?? null,
+            ghsa: record.cvss.ghsa?.score ?? null,
+            osv: record.cvss.osv?.score ?? null,
+        },
+        epss: {
+            score: record.epss.score,
+            percentile: record.epss.percentile,
+        },
+        kev: {
+            is_known: record.kev.is_known,
+            date_added: record.kev.date_added,
+        },
         ghsa_id: getGhsaId(record.aliases),
         cwe: record.cwe || [],
         cpe: record.cpe || [],
