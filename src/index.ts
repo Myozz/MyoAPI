@@ -51,7 +51,7 @@ app.get('/', (c) => {
     return c.json({
         name: 'MyoAPI',
         description: 'CVE Aggregator API - Centralized vulnerability data from multiple sources',
-        version: '1.0.0',
+        version: '1.0.1',
         documentation: 'https://github.com/Myozz/MyoAPI',
         endpoints: {
             cve: '/api/v1/cve/:id',
@@ -60,7 +60,7 @@ app.get('/', (c) => {
             stats: '/api/v1/stats',
             health: '/api/v1/stats/health',
         },
-        sources: ['OSV.dev', 'EPSS (FIRST.org)', 'CISA KEV', 'NVD'],
+        sources: ['NVD', 'OSV.dev', 'GHSA (GitHub)', 'EPSS (FIRST.org)', 'CISA KEV'],
     });
 });
 
