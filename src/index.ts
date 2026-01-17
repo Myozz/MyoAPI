@@ -51,7 +51,7 @@ app.get('/', (c) => {
     return c.json({
         name: 'MyoAPI',
         description: 'CVE Aggregator API - Centralized vulnerability data from multiple sources',
-        version: '2.1.0',
+        version: '2.2.0',
         documentation: 'https://github.com/Myozz/MyoAPI',
         endpoints: {
             cve: '/api/v1/cve/:id',
@@ -64,17 +64,17 @@ app.get('/', (c) => {
         },
         sources: ['NVD', 'OSV.dev', 'GHSA (GitHub)', 'EPSS (FIRST.org)', 'CISA KEV'],
         features: {
+            myo_score: 'CVSS (30%) + EPSS (50%) + KEV (20%)',
+            myo_severity: 'CRITICAL/HIGH/MEDIUM/LOW based on myo_score',
             cwe: 'Weakness types from NVD + GHSA',
             cpe: 'Product identifiers from NVD',
-            fixed_versions: 'Remediation info from GHSA/OSV',
-            priority_score: 'CVSS (30%) + EPSS (50%) + KEV (20%)',
-            deduplication: 'CVE/GHSA IDs merged from all sources',
+            affected_packages: 'Packages with affected_versions and fixed_versions',
         },
         stats: {
             total_cves: 328233,
             with_nvd: 303815,
             with_osv: 22637,
-            with_ghsa: '~10000',
+            with_ghsa: 10000,
             with_epss: 311012,
             kev_count: 1488,
         },

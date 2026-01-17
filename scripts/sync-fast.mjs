@@ -541,9 +541,6 @@ async function main() {
         // Description with fallback (NVD > GHSA)
         const description = nvd?.description || ghsa?.description || '';
 
-        // Fixed versions from GHSA
-        const fixed_versions = ghsa?.fixed_versions?.slice(0, 20) || [];
-
         records.push({
             id,
             title: ghsa?.summary || null,
@@ -561,7 +558,6 @@ async function main() {
 
             cwe,
             cpe,
-            fixed_versions,
 
             affected: {
                 nvd: [],

@@ -22,7 +22,6 @@ interface CveRecord {
     kev: { is_known: boolean; date_added: string | null; due_date: string | null };
     cwe: string[];
     cpe: string[];
-    fixed_versions: string[];
     affected: { nvd: unknown[]; osv: AffectedPackage[]; ghsa: AffectedPackage[] };
     refs: { nvd: string[]; osv: string[]; ghsa: string[]; vendor: string[] };
     aliases: string[];
@@ -41,7 +40,8 @@ interface CvssData {
 interface AffectedPackage {
     package: string;
     ecosystem: string;
-    versions: string[];
+    affected_versions: string[];
+    fixed_versions: string[];
 }
 
 interface SearchParams {
@@ -61,9 +61,8 @@ interface EnhancedCveResponse {
     id: string;
     title: string | null;
     description: string;
-    severity: string;
-    priority_severity: string;
-    priority_score: number;
+    myo_severity: string;
+    myo_score: number;
     cvss_score: number | null;
     epss_score: number | null;
     epss_percentile: number | null;
@@ -72,7 +71,6 @@ interface EnhancedCveResponse {
     ghsa_id: string | null;
     cwe: string[];
     cpe: string[];
-    fixed_versions: string[];
     aliases: string[];
     affected_packages: AffectedPackage[];
     refs: string[];
@@ -113,9 +111,8 @@ function enhanceCveRecord(record: CveRecord): EnhancedCveResponse {
         id: record.id,
         title: record.title,
         description: record.description,
-        severity: record.severity,
-        priority_severity: getPrioritySeverity(record.priority_score),
-        priority_score: record.priority_score,
+        myo_severity: getPrioritySeverity(record.priority_score),
+        myo_score: record.priority_score,
         cvss_score: getBestCvssScore(record.cvss),
         epss_score: record.epss.score,
         epss_percentile: record.epss.percentile,
@@ -124,9 +121,13 @@ function enhanceCveRecord(record: CveRecord): EnhancedCveResponse {
         ghsa_id: getGhsaId(record.aliases),
         cwe: record.cwe || [],
         cpe: record.cpe || [],
-        fixed_versions: record.fixed_versions || [],
         aliases: record.aliases,
-        affected_packages: [...(record.affected.osv || []), ...(record.affected.ghsa || [])],
+        affected_packages: [...(record.affected.osv || []), ...(record.affected.ghsa || [])].map((pkg: any) => ({
+            package: pkg.package,
+            ecosystem: pkg.ecosystem,
+            affected_versions: pkg.versions || pkg.affected_versions || [],
+            fixed_versions: pkg.fixed || pkg.fixed_versions || []
+        })),
         refs: allRefs,
         published: record.published,
         modified: record.modified,

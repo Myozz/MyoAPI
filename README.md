@@ -9,10 +9,9 @@ Free, open-source CVE aggregator API combining vulnerability data from multiple 
 
 - **328K+ CVEs** aggregated from NVD (1999-2026)
 - **5 Data Sources**: NVD, OSV, GHSA, EPSS, CISA KEV
-- **Priority Score**: Custom scoring = CVSS (30%) + EPSS (50%) + KEV (20%)
-- **CWE & CPE**: Weakness types and product identifiers from NVD
+- **Myo Score**: Custom scoring = CVSS (30%) + EPSS (50%) + KEV (20%)
+- **CWE & CPE**: Weakness types and product identifiers
 - **Package Search**: Query CVEs by package name and ecosystem
-- **Fixed Versions**: Remediation info from GHSA/OSV
 - **Fast**: Cloudflare Workers edge network
 - **Free**: No API keys required
 
@@ -21,17 +20,6 @@ Free, open-source CVE aggregator API combining vulnerability data from multiple 
 ```
 https://api.myoapi.workers.dev
 ```
-
-## Data Statistics
-
-| Source | Count |
-|--------|-------|
-| Total CVEs | 328,132 |
-| NVD CVSS | 303,561 |
-| EPSS Scores | 311,012 |
-| OSV Packages | 22,624 |
-| GHSA Advisories | ~20,000+ |
-| CISA KEV | 1,488 |
 
 ## Endpoints
 
@@ -44,26 +32,6 @@ https://api.myoapi.workers.dev
 | `GET` | `/api/v1/cve/recent` | Recent CVEs |
 | `GET` | `/api/v1/stats` | Database statistics |
 
-## Usage Examples
-
-### Get CVE Details
-
-```bash
-curl https://api.myoapi.workers.dev/api/v1/cve/CVE-2024-3400
-```
-
-### Search by Package
-
-```bash
-curl "https://api.myoapi.workers.dev/api/v1/cve/package?ecosystem=npm&name=lodash"
-```
-
-### Bulk Download
-
-```bash
-curl "https://api.myoapi.workers.dev/api/v1/cve/bulk?limit=1000&offset=0"
-```
-
 ## Response Format
 
 ```json
@@ -72,18 +40,21 @@ curl "https://api.myoapi.workers.dev/api/v1/cve/bulk?limit=1000&offset=0"
     "id": "CVE-2021-23337",
     "title": "Prototype Pollution in lodash",
     "description": "Lodash versions prior to 4.17.21 are vulnerable to...",
-    "severity": "CRITICAL",
-    "priority_severity": "CRITICAL",
-    "priority_score": 0.85,
+    "myo_severity": "CRITICAL",
+    "myo_score": 0.85,
     "cvss_score": 9.8,
     "epss_score": 0.45,
     "is_kev": true,
     "ghsa_id": "GHSA-35jh-r3h4-6jhm",
     "cwe": ["CWE-1321"],
     "cpe": ["cpe:2.3:a:lodash:lodash:*:*:*:*:*:*:*:*"],
-    "fixed_versions": ["4.17.21"],
     "affected_packages": [
-      { "package": "lodash", "ecosystem": "npm", "versions": ["<4.17.21"] }
+      {
+        "package": "lodash",
+        "ecosystem": "npm",
+        "affected_versions": ["<4.17.21"],
+        "fixed_versions": ["4.17.21"]
+      }
     ],
     "sources": ["nvd", "osv", "ghsa", "epss", "kev"]
   }
@@ -94,24 +65,23 @@ curl "https://api.myoapi.workers.dev/api/v1/cve/bulk?limit=1000&offset=0"
 
 | Field | Source | Description |
 |-------|--------|-------------|
-| `id` | NVD/OSV/GHSA | CVE ID (deduplicated) |
-| `title` | GHSA | Short summary |
-| `description` | NVD > GHSA | Full description with fallback |
+| `id` | NVD/OSV/GHSA | CVE ID |
+| `myo_severity` | Calculated | CRITICAL/HIGH/MEDIUM/LOW |
+| `myo_score` | Calculated | 0.0-1.0 priority score |
 | `cvss_score` | NVD > GHSA > OSV | Best CVSS score |
 | `epss_score` | EPSS | Exploit probability |
-| `cwe` | NVD + GHSA | Weakness types (merged) |
+| `cwe` | NVD + GHSA | Weakness types |
 | `cpe` | NVD | Product identifiers |
-| `fixed_versions` | GHSA/OSV | Remediation versions |
-| `affected_packages` | OSV + GHSA | Package info (merged) |
-| `priority_severity` | Calculated | CRITICAL/HIGH/MEDIUM/LOW |
+| `affected_packages.affected_versions` | OSV/GHSA | Vulnerable versions |
+| `affected_packages.fixed_versions` | OSV/GHSA | Patched versions |
 
-## Priority Score Formula
+## Myo Score Formula
 
 ```
-PriorityScore = (CVSS/10 × 0.3) + (EPSS × 0.5) + (KEV × 0.2)
+MyoScore = (CVSS/10 × 0.3) + (EPSS × 0.5) + (KEV × 0.2)
 ```
 
-**Priority Severity:**
+**Myo Severity:**
 
 - `≥0.7` → CRITICAL
 - `≥0.5` → HIGH
