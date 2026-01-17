@@ -20,7 +20,10 @@ interface CveRecord {
     cvss: { nvd: CvssData | null; osv: CvssData | null; ghsa: CvssData | null; vendor: unknown };
     epss: { score: number | null; percentile: number | null };
     kev: { is_known: boolean; date_added: string | null; due_date: string | null };
-    affected: { nvd: unknown[]; osv: AffectedPackage[] };
+    cwe: string[];
+    cpe: string[];
+    fixed_versions: string[];
+    affected: { nvd: unknown[]; osv: AffectedPackage[]; ghsa: AffectedPackage[] };
     refs: { nvd: string[]; osv: string[]; ghsa: string[]; vendor: string[] };
     aliases: string[];
     priority_score: number;
@@ -67,6 +70,9 @@ interface EnhancedCveResponse {
     is_kev: boolean;
     kev_date_added: string | null;
     ghsa_id: string | null;
+    cwe: string[];
+    cpe: string[];
+    fixed_versions: string[];
     aliases: string[];
     affected_packages: AffectedPackage[];
     refs: string[];
@@ -116,8 +122,11 @@ function enhanceCveRecord(record: CveRecord): EnhancedCveResponse {
         is_kev: record.kev.is_known,
         kev_date_added: record.kev.date_added,
         ghsa_id: getGhsaId(record.aliases),
+        cwe: record.cwe || [],
+        cpe: record.cpe || [],
+        fixed_versions: record.fixed_versions || [],
         aliases: record.aliases,
-        affected_packages: record.affected.osv || [],
+        affected_packages: [...(record.affected.osv || []), ...(record.affected.ghsa || [])],
         refs: allRefs,
         published: record.published,
         modified: record.modified,

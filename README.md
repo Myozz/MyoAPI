@@ -1,17 +1,18 @@
 # MyoAPI - CVE Aggregator API
 
-Free, open-source CVE aggregator API that combines vulnerability data from multiple authoritative sources.
+Free, open-source CVE aggregator API combining vulnerability data from multiple authoritative sources.
 
 [![Deploy](https://github.com/Myozz/myoapi/actions/workflows/deploy.yml/badge.svg)](https://github.com/Myozz/myoapi/actions/workflows/deploy.yml)
 [![Sync](https://github.com/Myozz/myoapi/actions/workflows/daily-sync.yml/badge.svg)](https://github.com/Myozz/myoapi/actions/workflows/daily-sync.yml)
 
 ## Features
 
-- **328K+ CVEs** from NVD (1999-2026)
-- **5 Data Sources**: NVD CVSS, OSV packages, GHSA advisories, EPSS scores, CISA KEV
-- **Priority Score**: Custom scoring combining CVSS (30%) + EPSS (50%) + KEV (20%)
+- **328K+ CVEs** aggregated from NVD (1999-2026)
+- **5 Data Sources**: NVD, OSV, GHSA, EPSS, CISA KEV
+- **Priority Score**: Custom scoring = CVSS (30%) + EPSS (50%) + KEV (20%)
+- **CWE & CPE**: Weakness types and product identifiers from NVD
 - **Package Search**: Query CVEs by package name and ecosystem
-- **Bulk Download**: Paginated API for syncing large datasets
+- **Fixed Versions**: Remediation info from GHSA/OSV
 - **Fast**: Cloudflare Workers edge network
 - **Free**: No API keys required
 
@@ -29,7 +30,7 @@ https://api.myoapi.workers.dev
 | NVD CVSS | 303,561 |
 | EPSS Scores | 311,012 |
 | OSV Packages | 22,624 |
-| GHSA Advisories | 714 |
+| GHSA Advisories | ~20,000+ |
 | CISA KEV | 1,488 |
 
 ## Endpoints
@@ -51,24 +52,16 @@ https://api.myoapi.workers.dev
 curl https://api.myoapi.workers.dev/api/v1/cve/CVE-2024-3400
 ```
 
-### Search by Package (for vulnerability scanners)
+### Search by Package
 
 ```bash
 curl "https://api.myoapi.workers.dev/api/v1/cve/package?ecosystem=npm&name=lodash"
-curl "https://api.myoapi.workers.dev/api/v1/cve/package?ecosystem=PyPI&name=requests"
 ```
 
-### Search CRITICAL CVEs
-
-```bash
-curl "https://api.myoapi.workers.dev/api/v1/cve/search?severity=CRITICAL&limit=10"
-```
-
-### Bulk Download (for sync)
+### Bulk Download
 
 ```bash
 curl "https://api.myoapi.workers.dev/api/v1/cve/bulk?limit=1000&offset=0"
-curl "https://api.myoapi.workers.dev/api/v1/cve/bulk?minPriority=0.5&limit=1000"
 ```
 
 ## Response Format
@@ -78,6 +71,7 @@ curl "https://api.myoapi.workers.dev/api/v1/cve/bulk?minPriority=0.5&limit=1000"
   "data": {
     "id": "CVE-2021-23337",
     "title": "Prototype Pollution in lodash",
+    "description": "Lodash versions prior to 4.17.21 are vulnerable to...",
     "severity": "CRITICAL",
     "priority_severity": "CRITICAL",
     "priority_score": 0.85,
@@ -85,32 +79,31 @@ curl "https://api.myoapi.workers.dev/api/v1/cve/bulk?minPriority=0.5&limit=1000"
     "epss_score": 0.45,
     "is_kev": true,
     "ghsa_id": "GHSA-35jh-r3h4-6jhm",
+    "cwe": ["CWE-1321"],
+    "cpe": ["cpe:2.3:a:lodash:lodash:*:*:*:*:*:*:*:*"],
+    "fixed_versions": ["4.17.21"],
     "affected_packages": [
       { "package": "lodash", "ecosystem": "npm", "versions": ["<4.17.21"] }
-    ]
+    ],
+    "sources": ["nvd", "osv", "ghsa", "epss", "kev"]
   }
 }
 ```
 
-## Search Parameters
+## Data Fields
 
-| Parameter | Description | Example |
-|-----------|-------------|---------|
-| `severity` | CRITICAL, HIGH, MEDIUM, LOW | `severity=CRITICAL` |
-| `isKev` or `kev` | Known Exploited Vulnerability | `kev=true` |
-| `hasOsv` or `osv` | Has OSV package data | `osv=true` |
-| `limit` | Results per page (max 1000) | `limit=100` |
-| `offset` | Pagination offset | `offset=0` |
-| `sort` or `sortBy` | Sort field | `sort=priority_score` |
-| `order` or `sortOrder` | asc or desc | `order=desc` |
-
-## Package Search Parameters
-
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `ecosystem` | Yes | npm, PyPI, Go, Maven, crates.io, NuGet, etc. |
-| `name` or `package` | Yes | Package name |
-| `limit` | No | Max results (default 100) |
+| Field | Source | Description |
+|-------|--------|-------------|
+| `id` | NVD/OSV/GHSA | CVE ID (deduplicated) |
+| `title` | GHSA | Short summary |
+| `description` | NVD > GHSA | Full description with fallback |
+| `cvss_score` | NVD > GHSA > OSV | Best CVSS score |
+| `epss_score` | EPSS | Exploit probability |
+| `cwe` | NVD + GHSA | Weakness types (merged) |
+| `cpe` | NVD | Product identifiers |
+| `fixed_versions` | GHSA/OSV | Remediation versions |
+| `affected_packages` | OSV + GHSA | Package info (merged) |
+| `priority_severity` | Calculated | CRITICAL/HIGH/MEDIUM/LOW |
 
 ## Priority Score Formula
 
@@ -118,21 +111,20 @@ curl "https://api.myoapi.workers.dev/api/v1/cve/bulk?minPriority=0.5&limit=1000"
 PriorityScore = (CVSS/10 × 0.3) + (EPSS × 0.5) + (KEV × 0.2)
 ```
 
-**Priority Severity Mapping:**
+**Priority Severity:**
 
 - `≥0.7` → CRITICAL
 - `≥0.5` → HIGH
 - `≥0.3` → MEDIUM
 - `≥0.1` → LOW
-- `<0.1` → UNKNOWN
 
 ## Data Sources
 
 | Source | Data | Update |
 |--------|------|--------|
-| [NVD](https://nvd.nist.gov/) | CVSS scores, descriptions | Daily |
+| [NVD](https://nvd.nist.gov/) | CVSS, CWE, CPE, descriptions | Daily |
 | [OSV](https://osv.dev/) | Affected packages | Daily |
-| [GHSA](https://github.com/advisories) | GitHub advisories | Daily |
+| [GHSA](https://github.com/advisories) | Advisories, fixed versions | Daily |
 | [EPSS](https://www.first.org/epss/) | Exploit probability | Daily |
 | [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | Active exploits | Daily |
 

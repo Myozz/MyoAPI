@@ -104,10 +104,60 @@ function parseNvdItem(item) {
             cvss = { score: d.baseScore, vector: d.vectorString, version: '2.0' };
         }
 
+        // Extract CWE IDs
+        let cwe = [];
+        if (cveData.weaknesses) {
+            for (const w of cveData.weaknesses) {
+                for (const desc of w.description || []) {
+                    if (desc.value?.startsWith('CWE-')) {
+                        cwe.push(desc.value);
+                    }
+                }
+            }
+        } else if (item.cwe?.cwe_data_meta) {
+            // Legacy format
+            const cweId = item.cwe.cwe_data_meta.ID;
+            if (cweId) cwe.push(cweId);
+        }
+        cwe = [...new Set(cwe)].slice(0, 10);  // Deduplicate
+
+        // Extract CPE URIs
+        let cpe = [];
+        if (cveData.configurations) {
+            for (const config of cveData.configurations) {
+                for (const node of config.nodes || []) {
+                    for (const match of node.cpeMatch || []) {
+                        if (match.criteria) {
+                            cpe.push(match.criteria);
+                        }
+                    }
+                }
+            }
+        } else if (item.configurations?.nodes) {
+            // Legacy format
+            for (const node of item.configurations.nodes) {
+                for (const match of node.cpe_match || []) {
+                    if (match.cpe23Uri) {
+                        cpe.push(match.cpe23Uri);
+                    }
+                }
+            }
+        }
+        cpe = [...new Set(cpe)].slice(0, 20);  // Deduplicate, limit
+
         let refs = [];
         if (cveData.references) refs = cveData.references.slice(0, 20).map(r => r.url);
 
-        return { id, description: description?.substring(0, 4000) || '', cvss, refs, published: cveData.published || item.publishedDate, modified: cveData.lastModified || item.lastModifiedDate };
+        return {
+            id,
+            description: description?.substring(0, 4000) || '',
+            cvss,
+            cwe,
+            cpe,
+            refs,
+            published: cveData.published || item.publishedDate,
+            modified: cveData.lastModified || item.lastModifiedDate
+        };
     } catch { return null; }
 }
 
@@ -203,108 +253,103 @@ async function fetchOsvBulkData() {
 }
 
 // =============================================================================
-// GHSA Bulk Download (from GitHub Advisory Database)
+// GHSA Bulk Download (via GitHub REST API)
 // =============================================================================
 
 async function fetchGhsaBulkData() {
-    console.log('[GHSA] Downloading GitHub Advisory Database...');
-    const ghsaMap = new Map();  // cveId -> ghsaData
+    console.log('[GHSA] Downloading GitHub Advisories via REST API...');
+    const ghsaMap = new Map();
 
-    for (const ecosystem of GHSA_ECOSYSTEMS) {
-        try {
-            // GitHub Advisory Database structure: advisories/{ecosystem}/{first2chars}/{ghsa_id}.json
-            // Fastest method: clone or download from API
-            const url = `https://api.github.com/advisories?ecosystem=${ecosystem}&per_page=100`;
-            console.log(`[GHSA] Fetching ${ecosystem}...`);
+    if (!GITHUB_TOKEN) {
+        console.log('[GHSA] No GITHUB_TOKEN - limited to 60 requests/hour.');
+        return ghsaMap;
+    }
 
-            let page = 1;
-            let count = 0;
-            let hasMore = true;
+    const baseUrl = 'https://api.github.com/advisories';
+    let page = 1;
+    let totalFetched = 0;
+    const maxPages = 100;
 
-            while (hasMore && page <= 50) {  // Max 5000 per ecosystem with token
-                const headers = {
-                    'User-Agent': 'MyoAPI/1.0',
-                    'Accept': 'application/vnd.github+json',
-                    'X-GitHub-Api-Version': '2022-11-28'
-                };
-                if (GITHUB_TOKEN) {
-                    headers['Authorization'] = `Bearer ${GITHUB_TOKEN}`;
-                }
+    try {
+        while (page <= maxPages) {
+            const url = `${baseUrl}?per_page=100&page=${page}`;
+            const headers = {
+                'User-Agent': 'MyoAPI/2.0',
+                'Accept': 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28',
+                'Authorization': `Bearer ${GITHUB_TOKEN}`
+            };
 
-                const response = await fetch(`${url}&page=${page}`, { headers });
+            const response = await fetch(url, { headers });
 
-                if (!response.ok) {
-                    if (response.status === 403) {
-                        console.log(`[GHSA] Rate limited, stopping at page ${page}`);
-                        break;
-                    }
+            if (!response.ok) {
+                if (response.status === 403) {
+                    console.log(`[GHSA] Rate limited at page ${page}`);
                     break;
                 }
+                console.log(`[GHSA] Error: ${response.status}`);
+                break;
+            }
 
-                const advisories = await response.json();
-                if (!advisories.length) break;
+            const advisories = await response.json();
+            if (!advisories.length) break;
 
-                for (const adv of advisories) {
-                    // Find CVE alias
-                    const cveId = adv.cve_id;
-                    if (!cveId?.startsWith('CVE-')) continue;
+            for (const adv of advisories) {
+                const cveId = adv.cve_id;
+                if (!cveId?.startsWith('CVE-')) continue;
 
-                    const existing = ghsaMap.get(cveId) || {
-                        cvss: null,
-                        severity: null,
-                        refs: [],
-                        ghsa_id: null,
-                        summary: null
-                    };
+                const existing = ghsaMap.get(cveId) || {
+                    cvss: null, refs: [], ghsa_id: null, summary: null,
+                    description: null, cwe: [], affected: [], fixed_versions: []
+                };
 
-                    // GHSA ID
-                    if (!existing.ghsa_id && adv.ghsa_id) {
-                        existing.ghsa_id = adv.ghsa_id;
+                if (!existing.ghsa_id && adv.ghsa_id) existing.ghsa_id = adv.ghsa_id;
+                if (!existing.summary && adv.summary) existing.summary = adv.summary.substring(0, 500);
+                if (!existing.description && adv.description) existing.description = adv.description.substring(0, 4000);
+
+                if (!existing.cvss && adv.cvss?.score) {
+                    existing.cvss = { score: adv.cvss.score, vector: adv.cvss.vector_string, version: '3.x' };
+                }
+
+                if (adv.cwes) {
+                    for (const cwe of adv.cwes) {
+                        const cweId = cwe.cwe_id;
+                        if (cweId && !existing.cwe.includes(cweId)) existing.cwe.push(cweId);
                     }
+                }
 
-                    // CVSS from GHSA
-                    if (!existing.cvss && adv.cvss?.score) {
-                        existing.cvss = {
-                            score: adv.cvss.score,
-                            vector: adv.cvss.vector_string || null,
-                            version: '3.x'
-                        };
+                if (adv.references) {
+                    for (const ref of adv.references.slice(0, 5)) {
+                        if (ref.url && !existing.refs.includes(ref.url)) existing.refs.push(ref.url);
                     }
+                }
 
-                    // Severity
-                    if (!existing.severity && adv.severity) {
-                        existing.severity = adv.severity.toUpperCase();
-                    }
-
-                    // Summary
-                    if (!existing.summary && adv.summary) {
-                        existing.summary = adv.summary.substring(0, 500);
-                    }
-
-                    // References
-                    if (adv.references) {
-                        for (const ref of adv.references.slice(0, 5)) {
-                            if (ref.url && !existing.refs.includes(ref.url)) {
-                                existing.refs.push(ref.url);
+                if (adv.vulnerabilities) {
+                    for (const vuln of adv.vulnerabilities) {
+                        if (vuln.package?.name && vuln.package?.ecosystem) {
+                            existing.affected.push({
+                                package: vuln.package.name,
+                                ecosystem: vuln.package.ecosystem,
+                                versions: vuln.vulnerable_version_range ? [vuln.vulnerable_version_range] : [],
+                                fixed: vuln.patched_versions ? [vuln.patched_versions] : []
+                            });
+                            if (vuln.patched_versions && !existing.fixed_versions.includes(vuln.patched_versions)) {
+                                existing.fixed_versions.push(vuln.patched_versions);
                             }
                         }
                     }
-
-                    ghsaMap.set(cveId, existing);
-                    count++;
                 }
 
-                hasMore = advisories.length === 100;
-                page++;
-
-                // Small delay to avoid rate limit
-                await new Promise(r => setTimeout(r, 100));
+                ghsaMap.set(cveId, existing);
+                totalFetched++;
             }
 
-            console.log(`[GHSA] ${ecosystem}: ${count} CVEs mapped`);
-        } catch (e) {
-            console.log(`[GHSA] ${ecosystem}: Error - ${e.message}`);
+            if (page % 10 === 0) console.log(`[GHSA] Page ${page}: ${totalFetched} CVEs...`);
+            page++;
+            await new Promise(r => setTimeout(r, 50));
         }
+    } catch (e) {
+        console.log(`[GHSA] Error: ${e.message}`);
     }
 
     console.log(`[GHSA] Total CVEs with GHSA data: ${ghsaMap.size}`);
@@ -478,19 +523,31 @@ async function main() {
         if (epss) sources.push('epss');
         if (kev) sources.push('kev');
 
-        // Merge aliases (OSV + GHSA ID)
-        const aliases = [...(osv?.aliases?.slice(0, 10) || [])];
-        if (ghsa?.ghsa_id && !aliases.includes(ghsa.ghsa_id)) {
-            aliases.push(ghsa.ghsa_id);
-        }
+        // Merge aliases (OSV + GHSA ID) - deduplicated
+        const aliases = [...new Set([
+            ...(osv?.aliases?.slice(0, 10) || []),
+            ...(ghsa?.ghsa_id ? [ghsa.ghsa_id] : [])
+        ])];
 
-        // Merge refs (NVD + OSV + GHSA)
-        const ghsaRefs = ghsa?.refs || [];
+        // Merge CWE from NVD and GHSA - deduplicated
+        const cwe = [...new Set([
+            ...(nvd?.cwe || []),
+            ...(ghsa?.cwe || [])
+        ])].slice(0, 10);
+
+        // CPE from NVD
+        const cpe = nvd?.cpe?.slice(0, 20) || [];
+
+        // Description with fallback (NVD > GHSA)
+        const description = nvd?.description || ghsa?.description || '';
+
+        // Fixed versions from GHSA
+        const fixed_versions = ghsa?.fixed_versions?.slice(0, 20) || [];
 
         records.push({
             id,
-            title: ghsa?.summary || null,  // Use GHSA summary as title if available
-            description: nvd?.description || '',
+            title: ghsa?.summary || null,
+            description,
             severity: getSeverity(cvssScore),
 
             cvss: {
@@ -501,14 +558,20 @@ async function main() {
             },
             epss: epss || { score: null, percentile: null },
             kev: kev || { is_known: false, date_added: null, due_date: null },
+
+            cwe,
+            cpe,
+            fixed_versions,
+
             affected: {
                 nvd: [],
-                osv: osv?.affected?.slice(0, 20) || []
+                osv: osv?.affected?.slice(0, 20) || [],
+                ghsa: ghsa?.affected?.slice(0, 20) || []
             },
             refs: {
                 nvd: nvd?.refs || [],
                 osv: osv?.refs || [],
-                ghsa: ghsaRefs,
+                ghsa: ghsa?.refs || [],
                 vendor: []
             },
 

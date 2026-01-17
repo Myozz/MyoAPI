@@ -5,11 +5,11 @@ API tổng hợp dữ liệu lỗ hổng bảo mật (CVE) miễn phí, mã ngu�
 ## Tính năng
 
 - **328K+ CVEs** từ NVD (1999-2026)
-- **5 nguồn dữ liệu**: NVD CVSS, OSV packages, GHSA advisories, EPSS scores, CISA KEV
+- **5 nguồn dữ liệu**: NVD, OSV, GHSA, EPSS, CISA KEV
 - **Priority Score**: Điểm ưu tiên = CVSS (30%) + EPSS (50%) + KEV (20%)
+- **CWE & CPE**: Loại lỗ hổng và định danh sản phẩm từ NVD
 - **Tìm theo Package**: Query CVE theo tên package và ecosystem
-- **Bulk Download**: API phân trang để sync dữ liệu lớn
-- **Nhanh**: Chạy trên Cloudflare Workers
+- **Fixed Versions**: Thông tin khắc phục từ GHSA/OSV
 - **Miễn phí**: Không cần API key
 
 ## Live API
@@ -26,7 +26,7 @@ https://api.myoapi.workers.dev
 | NVD CVSS | 303,561 |
 | EPSS Scores | 311,012 |
 | OSV Packages | 22,624 |
-| GHSA Advisories | 714 |
+| GHSA Advisories | ~20,000+ |
 | CISA KEV | 1,488 |
 
 ## API Endpoints
@@ -35,37 +35,10 @@ https://api.myoapi.workers.dev
 |----------|-------|
 | `GET /api/v1/cve/:id` | Lấy CVE theo ID |
 | `GET /api/v1/cve/search` | Tìm kiếm với filters |
-| `GET /api/v1/cve/package` | Tìm theo package (cho scanner) |
+| `GET /api/v1/cve/package` | Tìm theo package |
 | `GET /api/v1/cve/bulk` | Download hàng loạt |
 | `GET /api/v1/cve/recent` | CVE gần đây |
 | `GET /api/v1/stats` | Thống kê |
-
-## Ví dụ sử dụng
-
-### Lấy chi tiết CVE
-
-```bash
-curl https://api.myoapi.workers.dev/api/v1/cve/CVE-2024-3400
-```
-
-### Tìm theo Package (cho vulnerability scanner)
-
-```bash
-curl "https://api.myoapi.workers.dev/api/v1/cve/package?ecosystem=npm&name=lodash"
-curl "https://api.myoapi.workers.dev/api/v1/cve/package?ecosystem=PyPI&name=requests"
-```
-
-### Tìm CVE CRITICAL
-
-```bash
-curl "https://api.myoapi.workers.dev/api/v1/cve/search?severity=CRITICAL&limit=10"
-```
-
-### Bulk Download
-
-```bash
-curl "https://api.myoapi.workers.dev/api/v1/cve/bulk?limit=1000&offset=0"
-```
 
 ## Định dạng Response
 
@@ -81,31 +54,31 @@ curl "https://api.myoapi.workers.dev/api/v1/cve/bulk?limit=1000&offset=0"
     "epss_score": 0.45,
     "is_kev": true,
     "ghsa_id": "GHSA-35jh-r3h4-6jhm",
-    "affected_packages": [...]
+    "cwe": ["CWE-1321"],
+    "cpe": ["cpe:2.3:a:lodash:lodash:*:*:*:*:*:*:*:*"],
+    "fixed_versions": ["4.17.21"],
+    "affected_packages": [...],
+    "sources": ["nvd", "osv", "ghsa", "epss", "kev"]
   }
 }
 ```
 
-## Tham số Package Search
+## Các trường dữ liệu
 
-| Tham số | Bắt buộc | Mô tả |
-|---------|----------|-------|
-| `ecosystem` | Có | npm, PyPI, Go, Maven, etc. |
-| `name` | Có | Tên package |
-| `limit` | Không | Số kết quả (max 1000) |
+| Trường | Nguồn | Mô tả |
+|--------|-------|-------|
+| `id` | NVD/OSV/GHSA | CVE ID (deduplicated) |
+| `cwe` | NVD + GHSA | Loại lỗ hổng (merged) |
+| `cpe` | NVD | Định danh sản phẩm |
+| `fixed_versions` | GHSA/OSV | Phiên bản đã sửa |
+| `affected_packages` | OSV + GHSA | Packages bị ảnh hưởng |
+| `priority_severity` | Calculated | CRITICAL/HIGH/MEDIUM/LOW |
 
 ## Công thức Priority Score
 
 ```
 PriorityScore = (CVSS/10 × 0.3) + (EPSS × 0.5) + (KEV × 0.2)
 ```
-
-**Priority Severity:**
-
-- `≥0.7` → CRITICAL
-- `≥0.5` → HIGH
-- `≥0.3` → MEDIUM
-- `≥0.1` → LOW
 
 ## Phát triển
 
