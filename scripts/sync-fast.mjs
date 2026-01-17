@@ -72,6 +72,47 @@ async function fetchNvdBulkData() {
     return allCves;
 }
 
+// Parse CPE 2.3 string to package info
+// Format: cpe:2.3:part:vendor:product:version:update:edition:language:sw_edition:target_sw:target_hw:other
+function parseCpeToPackage(cpe) {
+    if (!cpe || !cpe.startsWith('cpe:2.3:')) return null;
+
+    const parts = cpe.split(':');
+    if (parts.length < 5) return null;
+
+    const type = parts[2];  // a=application, o=os, h=hardware
+    const vendor = parts[3] !== '*' ? parts[3] : null;
+    const product = parts[4] !== '*' ? parts[4] : null;
+    const version = parts[5] !== '*' && parts[5] !== '-' ? parts[5] : null;
+
+    if (!product) return null;
+
+    // Map to ecosystem based on vendor/product hints
+    let ecosystem = 'unknown';
+    const vendorLower = (vendor || '').toLowerCase();
+    const productLower = (product || '').toLowerCase();
+
+    if (vendorLower.includes('npm') || productLower.includes('node')) ecosystem = 'npm';
+    else if (vendorLower.includes('pypi') || productLower.includes('python')) ecosystem = 'PyPI';
+    else if (vendorLower.includes('maven') || productLower.includes('java')) ecosystem = 'Maven';
+    else if (vendorLower.includes('nuget') || productLower.includes('dotnet')) ecosystem = 'NuGet';
+    else if (vendorLower.includes('rubygems') || productLower.includes('ruby')) ecosystem = 'RubyGems';
+    else if (vendorLower.includes('packagist') || productLower.includes('php')) ecosystem = 'Packagist';
+    else if (vendorLower.includes('cargo') || productLower.includes('rust')) ecosystem = 'crates.io';
+    else if (vendorLower.includes('golang') || productLower.includes('go')) ecosystem = 'Go';
+    else if (type === 'o') ecosystem = 'OS';
+    else if (type === 'h') ecosystem = 'Hardware';
+
+    return {
+        package: product.replace(/_/g, '-'),
+        ecosystem,
+        vendor: vendor ? vendor.replace(/_/g, '-') : null,
+        versions: version ? [version] : [],
+        fixed: [],
+        status: 'affected'  // From CPE we only know affected, not fixed
+    };
+}
+
 function parseNvdItem(item) {
     try {
         const cveData = item.cve || item;
@@ -148,12 +189,24 @@ function parseNvdItem(item) {
         let refs = [];
         if (cveData.references) refs = cveData.references.slice(0, 20).map(r => r.url);
 
+        // Parse CPE to affected packages (fallback when OSV/GHSA have no data)
+        const affectedFromCpe = [];
+        const seenProducts = new Set();
+        for (const cpeUri of cpe) {
+            const pkg = parseCpeToPackage(cpeUri);
+            if (pkg && !seenProducts.has(pkg.package)) {
+                seenProducts.add(pkg.package);
+                affectedFromCpe.push(pkg);
+            }
+        }
+
         return {
             id,
             description: description?.substring(0, 4000) || '',
             cvss,
             cwe,
             cpe,
+            affected: affectedFromCpe.slice(0, 10),  // Limit to 10 packages
             refs,
             published: cveData.published || item.publishedDate,
             modified: cveData.lastModified || item.lastModifiedDate
@@ -599,7 +652,7 @@ async function main() {
             cpe,
 
             affected: {
-                nvd: [],
+                nvd: nvd?.affected?.slice(0, 10) || [],
                 osv: osv?.affected?.slice(0, 20) || [],
                 ghsa: ghsa?.affected?.slice(0, 20) || []
             },

@@ -10,7 +10,7 @@ Free, open-source CVE aggregator API combining vulnerability data from multiple 
 - **328K+ CVEs** aggregated from NVD (1999-2026)
 - **5 Data Sources**: NVD, OSV, GHSA, EPSS, CISA KEV
 - **Myo Score**: Custom scoring = CVSS (30%) + EPSS (50%) + KEV (20%)
-- **Multi-source CVSS**: Scores from NVD, GHSA, and OSV
+- **Multi-source Data**: Scores and packages from all sources with fallback
 - **Patch Status**: Track if vulnerabilities are fixed/affected
 - **Package Search**: Query CVEs by package name and ecosystem
 - **Fast**: Cloudflare Workers edge network
@@ -38,30 +38,41 @@ https://api.myoapi.workers.dev
 ```json
 {
   "data": {
-    "id": "CVE-2021-23337",
-    "title": "Prototype Pollution in lodash",
-    "description": "Lodash versions prior to 4.17.21 are vulnerable to...",
+    "id": "CVE-2023-4863",
+    "title": "Heap buffer overflow in WebP",
+    "description": "...",
     "myo_severity": "CRITICAL",
-    "myo_score": 0.85,
-    "cvss": { "nvd": 9.8, "ghsa": 9.8, "osv": null },
-    "epss": { "score": 0.45, "percentile": 0.97 },
-    "kev": { "is_known": true, "date_added": "2023-01-15" },
-    "ghsa_id": "GHSA-35jh-r3h4-6jhm",
-    "cwe": ["CWE-1321"],
-    "cpe": ["cpe:2.3:a:lodash:lodash:*:*:*:*:*:*:*:*"],
+    "myo_score": 0.92,
+    "cvss": { "nvd": 9.8, "ghsa": null, "osv": null },
+    "epss": { "score": 0.75, "percentile": 0.99 },
+    "kev": { "is_known": true, "date_added": "2023-09-13" },
     "affected_packages": [
       {
-        "package": "lodash",
-        "ecosystem": "npm",
-        "affected_versions": ["<4.17.21"],
-        "fixed_versions": ["4.17.21"],
-        "status": "fixed"
+        "package": "libwebp",
+        "ecosystem": "unknown",
+        "vendor": "google",
+        "affected_versions": ["1.3.1"],
+        "fixed_versions": [],
+        "status": "affected"
       }
     ],
-    "sources": ["nvd", "osv", "ghsa", "epss", "kev"]
+    "sources": ["nvd", "osv", "epss", "kev"]
   }
 }
 ```
+
+## Data Priority
+
+Data is merged from multiple sources with fallback:
+
+| Field | Priority |
+|-------|----------|
+| `cvss` | All sources shown independently |
+| `affected_packages` | OSV > GHSA > NVD (CPE parsed) |
+| `description` | NVD > GHSA |
+| `fixed_versions` | OSV/GHSA ranges > patched_versions |
+
+If OSV and GHSA have no package info, packages are extracted from NVD CPE data.
 
 ## Data Fields
 
@@ -70,27 +81,16 @@ https://api.myoapi.workers.dev
 | `myo_severity` | CRITICAL/HIGH/MEDIUM/LOW based on myo_score |
 | `myo_score` | Priority score (0.0-1.0) |
 | `cvss.nvd/ghsa/osv` | CVSS scores from each source |
-| `epss.score` | Exploit probability (0.0-1.0) |
-| `kev.is_known` | Known exploited vulnerability |
-| `affected_packages[].affected_versions` | Vulnerable version ranges |
-| `affected_packages[].fixed_versions` | Patched versions |
-| `affected_packages[].status` | `fixed` / `affected` / `unknown` |
+| `vendor` | Vendor name from CPE (NVD only) |
+| `affected_versions` | Vulnerable version ranges |
+| `fixed_versions` | Patched versions |
+| `status` | `fixed` / `affected` / `unknown` |
 
 ## Myo Score Formula
 
 ```
 MyoScore = (CVSS/10 × 0.3) + (EPSS × 0.5) + (KEV × 0.2)
 ```
-
-## Data Sources
-
-| Source | Data |
-|--------|------|
-| [NVD](https://nvd.nist.gov/) | CVSS, CWE, CPE, descriptions |
-| [OSV](https://osv.dev/) | Affected packages, fixed versions |
-| [GHSA](https://github.com/advisories) | Advisories, CVSS, fixed versions |
-| [EPSS](https://www.first.org/epss/) | Exploit probability |
-| [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | Active exploits |
 
 ## Development
 

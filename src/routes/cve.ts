@@ -40,6 +40,7 @@ interface CvssData {
 interface AffectedPackage {
     package: string;
     ecosystem: string;
+    vendor: string | null;
     affected_versions: string[];
     fixed_versions: string[];
     status: string;  // 'fixed' | 'affected' | 'unknown'
@@ -108,6 +109,34 @@ function enhanceCveRecord(record: CveRecord): EnhancedCveResponse {
         ...(record.refs.vendor || [])
     ].filter((v, i, a) => a.indexOf(v) === i).slice(0, 20);
 
+    // Merge affected from all sources (OSV > GHSA > NVD priority)
+    const osvAffected = record.affected.osv || [];
+    const ghsaAffected = record.affected.ghsa || [];
+    const nvdAffected = (record.affected as any).nvd || [];
+
+    // Use OSV/GHSA first, fallback to NVD if both are empty
+    let mergedAffected: any[] = [...osvAffected, ...ghsaAffected];
+    if (mergedAffected.length === 0 && nvdAffected.length > 0) {
+        mergedAffected = nvdAffected;
+    }
+
+    const affectedPackages = mergedAffected.map((pkg: any) => {
+        const fixedVersions = pkg.fixed || pkg.fixed_versions || [];
+        let status = pkg.status || 'unknown';
+        if (status === 'unknown') {
+            if (fixedVersions.length > 0) status = 'fixed';
+            else if ((pkg.versions || pkg.affected_versions || []).length > 0) status = 'affected';
+        }
+        return {
+            package: pkg.package,
+            ecosystem: pkg.ecosystem,
+            vendor: pkg.vendor || null,
+            affected_versions: pkg.versions || pkg.affected_versions || [],
+            fixed_versions: fixedVersions,
+            status
+        };
+    });
+
     return {
         id: record.id,
         title: record.title,
@@ -131,22 +160,7 @@ function enhanceCveRecord(record: CveRecord): EnhancedCveResponse {
         cwe: record.cwe || [],
         cpe: record.cpe || [],
         aliases: record.aliases,
-        affected_packages: [...(record.affected.osv || []), ...(record.affected.ghsa || [])].map((pkg: any) => {
-            const fixedVersions = pkg.fixed || pkg.fixed_versions || [];
-            // Determine status
-            let status = pkg.status || 'unknown';
-            if (status === 'unknown') {
-                if (fixedVersions.length > 0) status = 'fixed';
-                else if ((pkg.versions || pkg.affected_versions || []).length > 0) status = 'affected';
-            }
-            return {
-                package: pkg.package,
-                ecosystem: pkg.ecosystem,
-                affected_versions: pkg.versions || pkg.affected_versions || [],
-                fixed_versions: fixedVersions,
-                status
-            };
-        }),
+        affected_packages: affectedPackages,
         refs: allRefs,
         published: record.published,
         modified: record.modified,
