@@ -42,6 +42,7 @@ interface AffectedPackage {
     ecosystem: string;
     affected_versions: string[];
     fixed_versions: string[];
+    status: string;  // 'fixed' | 'affected' | 'unknown'
 }
 
 interface SearchParams {
@@ -130,12 +131,22 @@ function enhanceCveRecord(record: CveRecord): EnhancedCveResponse {
         cwe: record.cwe || [],
         cpe: record.cpe || [],
         aliases: record.aliases,
-        affected_packages: [...(record.affected.osv || []), ...(record.affected.ghsa || [])].map((pkg: any) => ({
-            package: pkg.package,
-            ecosystem: pkg.ecosystem,
-            affected_versions: pkg.versions || pkg.affected_versions || [],
-            fixed_versions: pkg.fixed || pkg.fixed_versions || []
-        })),
+        affected_packages: [...(record.affected.osv || []), ...(record.affected.ghsa || [])].map((pkg: any) => {
+            const fixedVersions = pkg.fixed || pkg.fixed_versions || [];
+            // Determine status
+            let status = pkg.status || 'unknown';
+            if (status === 'unknown') {
+                if (fixedVersions.length > 0) status = 'fixed';
+                else if ((pkg.versions || pkg.affected_versions || []).length > 0) status = 'affected';
+            }
+            return {
+                package: pkg.package,
+                ecosystem: pkg.ecosystem,
+                affected_versions: pkg.versions || pkg.affected_versions || [],
+                fixed_versions: fixedVersions,
+                status
+            };
+        }),
         refs: allRefs,
         published: record.published,
         modified: record.modified,

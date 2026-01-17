@@ -8,6 +8,7 @@ API tổng hợp dữ liệu lỗ hổng bảo mật (CVE) miễn phí, mã ngu�
 - **5 nguồn dữ liệu**: NVD, OSV, GHSA, EPSS, CISA KEV
 - **Myo Score**: Điểm ưu tiên = CVSS (30%) + EPSS (50%) + KEV (20%)
 - **Multi-source CVSS**: Điểm từ NVD, GHSA, OSV
+- **Trạng thái bản vá**: Theo dõi fixed/affected
 - **Tìm theo Package**: Query CVE theo package và ecosystem
 - **Miễn phí**: Không cần API key
 
@@ -37,28 +38,18 @@ https://api.myoapi.workers.dev
     "title": "Prototype Pollution in lodash",
     "myo_severity": "CRITICAL",
     "myo_score": 0.85,
-    "cvss": {
-      "nvd": 9.8,
-      "ghsa": 9.8,
-      "osv": null
-    },
-    "epss": {
-      "score": 0.45,
-      "percentile": 0.97
-    },
-    "kev": {
-      "is_known": true,
-      "date_added": "2023-01-15"
-    },
+    "cvss": { "nvd": 9.8, "ghsa": 9.8, "osv": null },
+    "epss": { "score": 0.45, "percentile": 0.97 },
+    "kev": { "is_known": true, "date_added": "2023-01-15" },
     "ghsa_id": "GHSA-35jh-r3h4-6jhm",
     "cwe": ["CWE-1321"],
-    "cpe": ["cpe:2.3:a:lodash:lodash:*:*:*:*:*:*:*:*"],
     "affected_packages": [
       {
         "package": "lodash",
         "ecosystem": "npm",
         "affected_versions": ["<4.17.21"],
-        "fixed_versions": ["4.17.21"]
+        "fixed_versions": ["4.17.21"],
+        "status": "fixed"
       }
     ],
     "sources": ["nvd", "osv", "ghsa", "epss", "kev"]
@@ -68,31 +59,22 @@ https://api.myoapi.workers.dev
 
 ## Các trường dữ liệu
 
-| Trường | Nguồn | Mô tả |
-|--------|-------|-------|
-| `myo_severity` | Tính toán | CRITICAL/HIGH/MEDIUM/LOW |
-| `myo_score` | Tính toán | Điểm ưu tiên 0.0-1.0 |
-| `cvss.nvd` | NVD | Điểm CVSS từ NVD |
-| `cvss.ghsa` | GHSA | Điểm CVSS từ GitHub |
-| `cvss.osv` | OSV | Điểm CVSS từ OSV |
-| `epss.score` | EPSS | Xác suất bị khai thác |
-| `epss.percentile` | EPSS | Xếp hạng percentile |
-| `kev.is_known` | CISA KEV | Đang bị khai thác |
-| `kev.date_added` | CISA KEV | Ngày thêm vào KEV |
-| `affected_packages` | OSV + GHSA | Packages bị ảnh hưởng |
+| Trường | Mô tả |
+|--------|-------|
+| `myo_severity` | CRITICAL/HIGH/MEDIUM/LOW |
+| `myo_score` | Điểm ưu tiên 0.0-1.0 |
+| `cvss.nvd/ghsa/osv` | Điểm CVSS từ từng nguồn |
+| `epss.score` | Xác suất bị khai thác |
+| `kev.is_known` | Đang bị khai thác |
+| `affected_versions` | Phiên bản bị ảnh hưởng |
+| `fixed_versions` | Phiên bản đã sửa |
+| `status` | `fixed` / `affected` / `unknown` |
 
 ## Công thức Myo Score
 
 ```
 MyoScore = (CVSS/10 × 0.3) + (EPSS × 0.5) + (KEV × 0.2)
 ```
-
-**Myo Severity:**
-
-- `≥0.7` → CRITICAL
-- `≥0.5` → HIGH
-- `≥0.3` → MEDIUM
-- `≥0.1` → LOW
 
 ## Phát triển
 

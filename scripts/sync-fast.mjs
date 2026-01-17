@@ -205,13 +205,35 @@ async function fetchOsvBulkData() {
                         }
                     }
 
-                    // Affected packages
+                    // Affected packages with fixed versions
                     if (vuln.affected) {
                         for (const aff of vuln.affected) {
+                            // Extract fixed versions from ranges
+                            const fixedVersions = [];
+                            if (aff.ranges) {
+                                for (const range of aff.ranges) {
+                                    for (const event of range.events || []) {
+                                        if (event.fixed) {
+                                            fixedVersions.push(event.fixed);
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Determine patch status
+                            let status = 'unknown';
+                            if (fixedVersions.length > 0) {
+                                status = 'fixed';
+                            } else if (aff.database_specific?.last_known_affected_version_range) {
+                                status = 'affected';
+                            }
+
                             existing.affected.push({
                                 package: aff.package?.name,
                                 ecosystem: aff.package?.ecosystem || ecosystem,
-                                versions: aff.versions?.slice(0, 10) || []
+                                versions: aff.versions?.slice(0, 10) || [],
+                                fixed: [...new Set(fixedVersions)].slice(0, 5),
+                                status
                             });
                         }
                     }
@@ -327,14 +349,31 @@ async function fetchGhsaBulkData() {
                 if (adv.vulnerabilities) {
                     for (const vuln of adv.vulnerabilities) {
                         if (vuln.package?.name && vuln.package?.ecosystem) {
+                            // Extract fixed versions from multiple fields
+                            const fixedVersions = [];
+                            if (vuln.patched_versions) fixedVersions.push(vuln.patched_versions);
+                            if (vuln.first_patched_version?.identifier) fixedVersions.push(vuln.first_patched_version.identifier);
+
+                            // Determine patch status
+                            let status = 'unknown';
+                            if (fixedVersions.length > 0) {
+                                status = 'fixed';
+                            } else if (vuln.vulnerable_version_range) {
+                                status = 'affected';
+                            }
+
                             existing.affected.push({
                                 package: vuln.package.name,
                                 ecosystem: vuln.package.ecosystem,
                                 versions: vuln.vulnerable_version_range ? [vuln.vulnerable_version_range] : [],
-                                fixed: vuln.patched_versions ? [vuln.patched_versions] : []
+                                fixed: [...new Set(fixedVersions)].slice(0, 5),
+                                status
                             });
-                            if (vuln.patched_versions && !existing.fixed_versions.includes(vuln.patched_versions)) {
-                                existing.fixed_versions.push(vuln.patched_versions);
+
+                            for (const fv of fixedVersions) {
+                                if (!existing.fixed_versions.includes(fv)) {
+                                    existing.fixed_versions.push(fv);
+                                }
                             }
                         }
                     }
