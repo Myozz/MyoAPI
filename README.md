@@ -9,7 +9,9 @@ Free, open-source CVE aggregator API that combines vulnerability data from multi
 
 - **328K+ CVEs** from NVD (1999-2026)
 - **5 Data Sources**: NVD CVSS, OSV packages, GHSA advisories, EPSS scores, CISA KEV
-- **Priority Score**: Custom scoring combining CVSS, EPSS, and KEV
+- **Priority Score**: Custom scoring combining CVSS (30%) + EPSS (50%) + KEV (20%)
+- **Package Search**: Query CVEs by package name and ecosystem
+- **Bulk Download**: Paginated API for syncing large datasets
 - **Fast**: Cloudflare Workers edge network
 - **Free**: No API keys required
 
@@ -29,8 +31,6 @@ https://api.myoapi.workers.dev
 | OSV Packages | 22,624 |
 | GHSA Advisories | 714 |
 | CISA KEV | 1,488 |
-| CRITICAL | 38,646 |
-| HIGH | 108,471 |
 
 ## Endpoints
 
@@ -38,21 +38,58 @@ https://api.myoapi.workers.dev
 |:------:|----------|-------------|
 | `GET` | `/api/v1/cve/:id` | Get CVE by ID |
 | `GET` | `/api/v1/cve/search` | Search with filters |
+| `GET` | `/api/v1/cve/package` | Search by package name |
+| `GET` | `/api/v1/cve/bulk` | Bulk download with pagination |
 | `GET` | `/api/v1/cve/recent` | Recent CVEs |
 | `GET` | `/api/v1/stats` | Database statistics |
-| `GET` | `/api/v1/stats/health` | Health check |
 
-## Usage
+## Usage Examples
+
+### Get CVE Details
 
 ```bash
-# Get CVE details
 curl https://api.myoapi.workers.dev/api/v1/cve/CVE-2024-3400
+```
 
-# Search CRITICAL CVEs
+### Search by Package (for vulnerability scanners)
+
+```bash
+curl "https://api.myoapi.workers.dev/api/v1/cve/package?ecosystem=npm&name=lodash"
+curl "https://api.myoapi.workers.dev/api/v1/cve/package?ecosystem=PyPI&name=requests"
+```
+
+### Search CRITICAL CVEs
+
+```bash
 curl "https://api.myoapi.workers.dev/api/v1/cve/search?severity=CRITICAL&limit=10"
+```
 
-# Filter by KEV status
-curl "https://api.myoapi.workers.dev/api/v1/cve/search?isKev=true&limit=20"
+### Bulk Download (for sync)
+
+```bash
+curl "https://api.myoapi.workers.dev/api/v1/cve/bulk?limit=1000&offset=0"
+curl "https://api.myoapi.workers.dev/api/v1/cve/bulk?minPriority=0.5&limit=1000"
+```
+
+## Response Format
+
+```json
+{
+  "data": {
+    "id": "CVE-2021-23337",
+    "title": "Prototype Pollution in lodash",
+    "severity": "CRITICAL",
+    "priority_severity": "CRITICAL",
+    "priority_score": 0.85,
+    "cvss_score": 9.8,
+    "epss_score": 0.45,
+    "is_kev": true,
+    "ghsa_id": "GHSA-35jh-r3h4-6jhm",
+    "affected_packages": [
+      { "package": "lodash", "ecosystem": "npm", "versions": ["<4.17.21"] }
+    ]
+  }
+}
 ```
 
 ## Search Parameters
@@ -60,9 +97,34 @@ curl "https://api.myoapi.workers.dev/api/v1/cve/search?isKev=true&limit=20"
 | Parameter | Description | Example |
 |-----------|-------------|---------|
 | `severity` | CRITICAL, HIGH, MEDIUM, LOW | `severity=CRITICAL` |
-| `isKev` | Known Exploited Vulnerability | `isKev=true` |
-| `hasOsv` | Has OSV package data | `hasOsv=true` |
-| `limit` | Results per page (max 100) | `limit=20` |
+| `isKev` or `kev` | Known Exploited Vulnerability | `kev=true` |
+| `hasOsv` or `osv` | Has OSV package data | `osv=true` |
+| `limit` | Results per page (max 1000) | `limit=100` |
+| `offset` | Pagination offset | `offset=0` |
+| `sort` or `sortBy` | Sort field | `sort=priority_score` |
+| `order` or `sortOrder` | asc or desc | `order=desc` |
+
+## Package Search Parameters
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `ecosystem` | Yes | npm, PyPI, Go, Maven, crates.io, NuGet, etc. |
+| `name` or `package` | Yes | Package name |
+| `limit` | No | Max results (default 100) |
+
+## Priority Score Formula
+
+```
+PriorityScore = (CVSS/10 × 0.3) + (EPSS × 0.5) + (KEV × 0.2)
+```
+
+**Priority Severity Mapping:**
+
+- `≥0.7` → CRITICAL
+- `≥0.5` → HIGH
+- `≥0.3` → MEDIUM
+- `≥0.1` → LOW
+- `<0.1` → UNKNOWN
 
 ## Data Sources
 
@@ -73,12 +135,6 @@ curl "https://api.myoapi.workers.dev/api/v1/cve/search?isKev=true&limit=20"
 | [GHSA](https://github.com/advisories) | GitHub advisories | Daily |
 | [EPSS](https://www.first.org/epss/) | Exploit probability | Daily |
 | [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | Active exploits | Daily |
-
-## Priority Score
-
-```
-PriorityScore = (CVSS/10 × 0.3) + (EPSS × 0.5) + (KEV × 0.2)
-```
 
 ## Development
 

@@ -12,6 +12,7 @@ dist/
 .dev.vars
 
 # IDE
+.agent/
 .idea/
 .vscode/
 *.swp
@@ -40,3 +41,4 @@ temp/
 # Data sync secrets (private)
 scripts/.env
 scripts/DATA_SOURCES.md
+.agent
