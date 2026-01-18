@@ -408,7 +408,13 @@ async function fetchGhsaBulkData() {
                             // Extract fixed versions from multiple fields
                             const fixedVersions = [];
                             if (vuln.patched_versions) fixedVersions.push(vuln.patched_versions);
-                            if (vuln.first_patched_version?.identifier) fixedVersions.push(vuln.first_patched_version.identifier);
+                            // first_patched_version can be string or {identifier: string}
+                            if (vuln.first_patched_version) {
+                                const fpv = typeof vuln.first_patched_version === 'string'
+                                    ? vuln.first_patched_version
+                                    : vuln.first_patched_version.identifier;
+                                if (fpv) fixedVersions.push(fpv);
+                            }
 
                             // Determine patch status
                             let status = 'unknown';
