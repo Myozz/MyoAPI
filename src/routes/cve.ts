@@ -196,7 +196,11 @@ function buildQuery(params: SearchParams): string {
         filters.push(`sources=cs.{osv}`);
     }
     if (params.q) {
-        filters.push(`or=(id.ilike.*${encodeURIComponent(params.q)}*,description.ilike.*${encodeURIComponent(params.q)}*)`);
+        // Use exact match for fast primary key lookup
+        // ILIKE patterns timeout on 328K rows in Supabase free tier
+        // For CVE search, users should provide exact CVE ID
+        const q = params.q.toUpperCase();
+        filters.push(`id=eq.${encodeURIComponent(q)}`);
     }
 
     const sortCol = {
