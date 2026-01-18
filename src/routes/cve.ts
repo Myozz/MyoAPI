@@ -197,8 +197,7 @@ function buildQuery(params: SearchParams): string {
     }
     if (params.q) {
         // Use exact match for fast primary key lookup
-        // ILIKE patterns timeout on 328K rows in Supabase free tier
-        // For CVE search, users should provide exact CVE ID
+        // Full-text search requires migration (see migrations/001_fulltext_search.sql)
         const q = params.q.toUpperCase();
         filters.push(`id=eq.${encodeURIComponent(q)}`);
     }
