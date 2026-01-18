@@ -261,12 +261,15 @@ async function fetchOsvBulkData() {
                     // Affected packages with fixed versions
                     if (vuln.affected) {
                         for (const aff of vuln.affected) {
-                            // Extract fixed versions from ranges
+                            // Extract fixed versions from ranges (only SEMVER/ECOSYSTEM, skip GIT commits)
                             const fixedVersions = [];
                             if (aff.ranges) {
                                 for (const range of aff.ranges) {
+                                    // Skip GIT ranges (contain commit hashes, not versions)
+                                    if (range.type === 'GIT') continue;
+
                                     for (const event of range.events || []) {
-                                        if (event.fixed) {
+                                        if (event.fixed && !event.fixed.match(/^[0-9a-f]{40}$/)) {
                                             fixedVersions.push(event.fixed);
                                         }
                                     }
